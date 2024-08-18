@@ -14,5 +14,9 @@
   "type": "module",
   "workspaces": [
     "src/iitest_frontend"
-  ]
+  ],
+  "devDependencies": {
+    "@dfinity/auth-client": "^2.0.0",
+    "@dfinity/identity": "^2.0.0"
+  }
 }

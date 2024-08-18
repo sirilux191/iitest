@@ -1,30 +1,67 @@
-import { useState } from 'react';
-import { iitest_backend } from 'declarations/iitest_backend';
+import React, { useState } from "react";
+import { createActor, iitest_backend } from "../../declarations/iitest_backend";
+import { AuthClient } from "@dfinity/auth-client";
+import { HttpAgent } from "@dfinity/agent";
+import ActorContext from "./ActorContext";
+import GreetComponent from "./GreetComponent";
 
 function App() {
-  const [greeting, setGreeting] = useState('');
+  const [actor, setActor] = useState(iitest_backend);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  function handleSubmit(event) {
+  const loginButton = async (event) => {
     event.preventDefault();
-    const name = event.target.elements.name.value;
-    iitest_backend.greet(name).then((greeting) => {
-      setGreeting(greeting);
-    });
-    return false;
-  }
+    try {
+      const authClient = await AuthClient.create();
+      await new Promise((resolve) => {
+        authClient.login({
+          identityProvider: process.env.II_URL,
+          onSuccess: resolve,
+        });
+      });
+
+      const identity = authClient.getIdentity();
+      const agent = new HttpAgent({ identity });
+
+      if (process.env.DFX_NETWORK !== "ic") {
+        await agent.fetchRootKey().catch((err) => {
+          console.warn(
+            "Unable to fetch root key. Check to ensure that your local replica is running"
+          );
+          console.error(err);
+        });
+      }
+
+      const newActor = createActor(process.env.IITEST_BACKEND_CANISTER_ID, {
+        agent,
+      });
+
+      setActor(newActor);
+      setIsAuthenticated(true);
+    } catch (error) {
+      console.error("Login failed:", error);
+      if (error.message) console.error("Error message:", error.message);
+      if (error.stack) console.error("Error stack:", error.stack);
+    }
+  };
 
   return (
-    <main>
-      <img src="/logo2.svg" alt="DFINITY logo" />
-      <br />
-      <br />
-      <form action="#" onSubmit={handleSubmit}>
-        <label htmlFor="name">Enter your name: &nbsp;</label>
-        <input id="name" alt="Name" type="text" />
-        <button type="submit">Click Me!</button>
-      </form>
-      <section id="greeting">{greeting}</section>
-    </main>
+    <ActorContext.Provider value={actor}>
+      <main>
+        <img
+          src="/logo2.svg"
+          alt="DFINITY logo"
+        />
+        <br />
+        <br />
+
+        {!isAuthenticated ? (
+          <button onClick={loginButton}>Log In</button>
+        ) : (
+          <GreetComponent />
+        )}
+      </main>
+    </ActorContext.Provider>
   );
 }
 
